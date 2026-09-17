@@ -1,0 +1,6 @@
+{
+  "name": "AutoBlog Pro - 블로그 자동화 수익화 프로그램",
+  "description": "해외 타겟 구글 블로그(Blogger) 전용 3단 AI(주제 AI ➔ 글쓰기 AI ➔ 발행/분석 AI) 무인 자동화 및 통계 시스템",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
