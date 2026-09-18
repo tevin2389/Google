@@ -7,6 +7,7 @@ import { AddEditBlogModal } from "./components/AddEditBlogModal";
 import { OllamaSettingsModal } from "./components/OllamaSettingsModal";
 import { WindowsBotDownloader } from "./components/WindowsBotDownloader";
 import { MonetizationPlaybookModal } from "./components/MonetizationPlaybookModal";
+import { ConnectionStatusModal } from "./components/ConnectionStatusModal";
 import { 
   BlogItem, 
   PipelineItem, 
@@ -184,18 +185,40 @@ export default function App() {
       return stored ? JSON.parse(stored) : {
         host: "http://localhost:11434",
         selectedModel: "qwen2.5:7b",
-        useOllama: true,
-        isConnected: true,
+        useOllama: false,
+        isConnected: false,
       };
     } catch {
       return {
         host: "http://localhost:11434",
         selectedModel: "qwen2.5:7b",
-        useOllama: true,
-        isConnected: true,
+        useOllama: false,
+        isConnected: false,
       };
     }
   });
+
+  // Verify Ollama connection status on initial load
+  useEffect(() => {
+    let isMounted = true;
+    fetch(`/api/ollama/status?host=${encodeURIComponent(ollamaSettings.host || "http://localhost:11434")}`)
+      .then((res) => res.json())
+      .then((data) => {
+        if (!isMounted) return;
+        if (data.connected) {
+          setOllamaSettings((prev) => ({ ...prev, isConnected: true, useOllama: true }));
+        } else {
+          setOllamaSettings((prev) => ({ ...prev, isConnected: false, useOllama: false }));
+        }
+      })
+      .catch(() => {
+        if (!isMounted) return;
+        setOllamaSettings((prev) => ({ ...prev, isConnected: false, useOllama: false }));
+      });
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   // Real-time Pipeline Logs
   const [pipelineLogs, setPipelineLogs] = useState<PipelineLog[]>([
@@ -217,6 +240,7 @@ export default function App() {
   const [isOllamaModalOpen, setIsOllamaModalOpen] = useState(false);
   const [isWindowsBotOpen, setIsWindowsBotOpen] = useState(false);
   const [isPlaybookOpen, setIsPlaybookOpen] = useState(false);
+  const [isConnectionModalOpen, setIsConnectionModalOpen] = useState(false);
 
   // In-flight guard to avoid duplicate executions
   const processingRef = useRef<{ [key: string]: boolean }>({});
@@ -550,6 +574,17 @@ export default function App() {
     }
   };
 
+  // Trigger Multi-Agent Swarm on ALL active blogs simultaneously
+  const handleTriggerAllBlogsTopicAi = async () => {
+    const activeBlogs = blogs.filter((b) => b.isActive !== false);
+    if (activeBlogs.length === 0) return;
+
+    // Run all Topic AIs in parallel
+    await Promise.all(
+      activeBlogs.map((b) => handleTriggerTopicAi(b.id, true))
+    );
+  };
+
   // Adjust remaining delay of a queue item (+ / - 1min, 15min, 1hour)
   const handleAdjustItemDelay = (itemId: string, deltaSec: number) => {
     setPipelineItems((prev) =>
@@ -695,6 +730,7 @@ export default function App() {
         openPlaybook={() => setIsPlaybookOpen(true)}
         openOllamaModal={() => setIsOllamaModalOpen(true)}
         openWindowsBot={() => setIsWindowsBotOpen(true)}
+        openConnectionModal={() => setIsConnectionModalOpen(true)}
         ollamaSettings={ollamaSettings}
         blogCount={blogs.length}
       />
@@ -736,6 +772,7 @@ export default function App() {
                 setIsAddEditModalOpen(true);
               }}
               onDeleteBlog={handleDeleteBlog}
+              onTriggerAllBlogsTopicAi={handleTriggerAllBlogsTopicAi}
             />
           )
         ) : (
@@ -791,6 +828,22 @@ export default function App() {
       <MonetizationPlaybookModal
         isOpen={isPlaybookOpen}
         onClose={() => setIsPlaybookOpen(false)}
+      />
+
+      {/* 5. AI & Blog Connection Status Modal */}
+      <ConnectionStatusModal
+        isOpen={isConnectionModalOpen}
+        onClose={() => setIsConnectionModalOpen(false)}
+        blogs={blogs}
+        ollamaSettings={ollamaSettings}
+        onOpenOllamaModal={() => {
+          setIsConnectionModalOpen(false);
+          setIsOllamaModalOpen(true);
+        }}
+        onOpenWindowsBot={() => {
+          setIsConnectionModalOpen(false);
+          setIsWindowsBotOpen(true);
+        }}
       />
     </div>
   );

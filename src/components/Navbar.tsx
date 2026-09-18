@@ -18,6 +18,7 @@ interface NavbarProps {
   openPlaybook: () => void;
   openOllamaModal: () => void;
   openWindowsBot: () => void;
+  openConnectionModal: () => void;
   ollamaSettings: OllamaSettings;
   blogCount: number;
 }
@@ -28,6 +29,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   openPlaybook,
   openOllamaModal,
   openWindowsBot,
+  openConnectionModal,
   ollamaSettings,
   blogCount,
 }) => {
@@ -89,6 +91,26 @@ export const Navbar: React.FC<NavbarProps> = ({
 
           {/* Quick Shortcuts & Modal Triggers */}
           <div className="flex items-center gap-2">
+            {/* AI & Blog Connection Status Indicator */}
+            <button
+              id="btn-navbar-connection-status"
+              onClick={openConnectionModal}
+              className="flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-bold bg-slate-900/90 hover:bg-slate-800 text-slate-200 border border-slate-700/80 shadow-sm transition-all hover:border-cyan-500/50"
+              title="AI 엔진 및 구글 블로그 채널 연결 상태 보기"
+            >
+              <div className="flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse shadow-[0_0_8px_rgba(52,211,153,0.8)]" />
+                <span className="text-slate-300">
+                  {ollamaSettings.useOllama && ollamaSettings.isConnected ? "Ollama 로컬 AI" : "Gemini 클라우드 AI"}
+                </span>
+              </div>
+              <div className="w-px h-3 bg-slate-700 hidden sm:block" />
+              <div className="hidden sm:flex items-center gap-1 text-orange-300">
+                <Globe className="w-3 h-3 text-orange-400" />
+                <span>블로그 {blogCount}개</span>
+              </div>
+            </button>
+
             {/* Ollama Switcher */}
             <button
               id="btn-navbar-ollama"

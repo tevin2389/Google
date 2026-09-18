@@ -28,6 +28,8 @@ import {
   ShieldCheck,
   Link2,
   BookOpen,
+  Send,
+  Zap,
   Image as ImageIcon
 } from "lucide-react";
 import { BlogItem, PipelineItem, PipelineLog, OllamaSettings, StageAiConfig, DirectorAdvice, BlogArticleRecord } from "../types";
@@ -362,8 +364,13 @@ export const DedicatedBlogPipeline: React.FC<DedicatedBlogPipelineProps> = ({
                         </span>
                       </div>
 
-                      <h3 className="font-bold text-xs sm:text-sm text-slate-100 leading-snug">
-                        {item.topic}
+                      <h3 
+                        onClick={() => setSelectedArticleItem(item)}
+                        className="font-bold text-xs sm:text-sm text-slate-100 leading-snug cursor-pointer hover:text-cyan-400 hover:underline transition-colors flex items-center justify-between gap-1.5 group"
+                        title="주제 상세 및 대기열 정보 팝업 보기"
+                      >
+                        <span>{item.topic}</span>
+                        <ExternalLink className="w-3.5 h-3.5 text-cyan-400 shrink-0 opacity-60 group-hover:opacity-100 transition-opacity" />
                       </h3>
 
                       {/* Remaining Timer Display */}
@@ -532,8 +539,13 @@ export const DedicatedBlogPipeline: React.FC<DedicatedBlogPipelineProps> = ({
                         )}
                       </div>
 
-                      <h3 className="font-bold text-xs sm:text-sm text-slate-100 leading-snug">
-                        {title}
+                      <h3 
+                        onClick={() => setSelectedArticleItem(item)}
+                        className="font-bold text-xs sm:text-sm text-slate-100 leading-snug cursor-pointer hover:text-indigo-300 hover:underline transition-colors flex items-center justify-between gap-1.5 group"
+                        title="작성된 글 본문 및 검수 리포트 팝업 열기"
+                      >
+                        <span>{title}</span>
+                        <ExternalLink className="w-3.5 h-3.5 text-indigo-400 shrink-0 opacity-60 group-hover:opacity-100 transition-opacity" />
                       </h3>
 
                       {/* Remaining Timer Display */}
@@ -697,8 +709,13 @@ export const DedicatedBlogPipeline: React.FC<DedicatedBlogPipelineProps> = ({
                         </span>
                       </div>
 
-                      <h3 className="font-bold text-xs sm:text-sm text-white leading-snug">
-                        {title}
+                      <h3 
+                        onClick={() => setSelectedArticleItem(item)}
+                        className="font-bold text-xs sm:text-sm text-white leading-snug cursor-pointer hover:text-emerald-400 hover:underline transition-colors flex items-center justify-between gap-1.5 group"
+                        title="발행 완료 글 내용 및 분석 리포트 팝업 열기"
+                      >
+                        <span>{title}</span>
+                        <ExternalLink className="w-3.5 h-3.5 text-emerald-400 shrink-0 opacity-60 group-hover:opacity-100 transition-opacity" />
                       </h3>
 
                       <div className="pt-2 border-t border-slate-800/80 flex items-center justify-between">
@@ -750,106 +767,280 @@ export const DedicatedBlogPipeline: React.FC<DedicatedBlogPipelineProps> = ({
         </div>
       </div>
 
-      {/* Article Detail / Google Blogger Export Modal */}
+      {/* Article Detail & Topic Queue Inspection Modal */}
       {selectedArticleItem && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="w-full max-w-3xl max-h-[85vh] bg-slate-900 border border-slate-700 rounded-3xl p-6 shadow-2xl flex flex-col text-slate-100">
+          <div className="w-full max-w-3xl max-h-[88vh] bg-slate-900 border border-slate-700 rounded-3xl p-6 shadow-2xl flex flex-col text-slate-100">
             {/* Modal Header */}
             <div className="flex items-center justify-between border-b border-slate-800 pb-4">
-              <div>
-                <span className="text-[11px] font-bold text-orange-400 uppercase tracking-wider">
-                  구글 블로그(Google Blogger) 포스팅 데이터
-                </span>
-                <h2 className="text-lg font-bold text-white mt-0.5 line-clamp-1">
+              <div className="space-y-0.5">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider border ${
+                    selectedArticleItem.stage === "waiting_write" || selectedArticleItem.stage === "writing"
+                      ? "bg-cyan-500/20 text-cyan-300 border-cyan-500/30"
+                      : selectedArticleItem.stage === "waiting_publish" || selectedArticleItem.stage === "publishing"
+                      ? "bg-indigo-500/20 text-indigo-300 border-indigo-500/30"
+                      : "bg-emerald-500/20 text-emerald-300 border-emerald-500/30"
+                  }`}>
+                    {selectedArticleItem.stage === "waiting_write" ? "⏳ 1단 글쓰기 대기열" :
+                     selectedArticleItem.stage === "writing" ? "✍️ 1단 글쓰기 AI 집필 중" :
+                     selectedArticleItem.stage === "waiting_publish" ? "📬 2단 블로그 발행 대기열" :
+                     selectedArticleItem.stage === "publishing" ? "🚀 2단 발행 전송 중" :
+                     "✅ 3단 발행 완료 아카이브"}
+                  </span>
+                  <span className="text-slate-400 text-xs">
+                    채널: <strong className="text-slate-200">{blog.name}</strong>
+                  </span>
+                </div>
+                <h2 className="text-base sm:text-lg font-bold text-white mt-1 line-clamp-2">
                   {selectedArticleItem.generatedArticle?.selectedTitle || selectedArticleItem.topic}
                 </h2>
               </div>
               <button
                 onClick={() => setSelectedArticleItem(null)}
-                className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-slate-300"
+                className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-slate-300 transition-colors shrink-0 ml-2"
               >
-                닫기
+                ✕ 닫기
               </button>
             </div>
 
             {/* Modal Body */}
             <div className="flex-1 overflow-y-auto my-4 space-y-4 pr-2">
-              {/* Stats badges */}
-              <div className="flex items-center gap-3 flex-wrap text-xs">
-                <span className="px-3 py-1 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 font-bold">
-                  SEO 점수: {selectedArticleItem.generatedArticle?.seoScore || 95}점
-                </span>
-                <span className="px-3 py-1 rounded-xl bg-amber-500/15 border border-amber-500/30 text-amber-300 font-bold">
-                  예상 애드센스 단가: {selectedArticleItem.analyticsReport?.estimatedCpc || "$3.50"}
-                </span>
-                <span className="px-3 py-1 rounded-xl bg-cyan-500/15 border border-cyan-500/30 text-cyan-300 font-bold">
-                  태그: {selectedArticleItem.generatedArticle?.tags?.join(", ") || "Global, AI, Tech"}
-                </span>
-                {selectedArticleItem.generatedArticle?.images && selectedArticleItem.generatedArticle.images.length > 0 && (
-                  <span className="px-3 py-1 rounded-xl bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 font-bold flex items-center gap-1.5">
-                    <ImageIcon className="w-3.5 h-3.5 text-emerald-400" />
-                    <span>AI 자동 이미지 {selectedArticleItem.generatedArticle.images.length}장 삽입 완료</span>
-                  </span>
-                )}
-              </div>
-
-              {/* AI Auto Image Inspection Card */}
-              {selectedArticleItem.generatedArticle?.images && selectedArticleItem.generatedArticle.images.length > 0 && (
-                <div className="p-3.5 rounded-2xl bg-slate-950 border border-slate-800 space-y-2.5">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <ImageIcon className="w-4 h-4 text-emerald-400" />
-                      <span className="text-xs font-bold text-white">자동 수집 및 본문 배치된 이미지 메타데이터</span>
-                    </div>
-                    <span className="text-[11px] text-emerald-400 font-semibold bg-emerald-950/60 px-2 py-0.5 rounded-lg border border-emerald-800/60">
-                      리뷰 AI 검수 통과 (점수: {selectedArticleItem.generatedArticle?.imageReviewAudit?.score || 98}점)
+              {/* CASE 1: Article content is already generated */}
+              {selectedArticleItem.generatedArticle ? (
+                <>
+                  {/* Stats badges */}
+                  <div className="flex items-center gap-2.5 flex-wrap text-xs">
+                    <span className="px-3 py-1 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 font-bold">
+                      SEO 점수: {selectedArticleItem.generatedArticle.seoScore || 95}점
                     </span>
+                    <span className="px-3 py-1 rounded-xl bg-amber-500/15 border border-amber-500/30 text-amber-300 font-bold">
+                      예상 애드센스 단가: {selectedArticleItem.analyticsReport?.estimatedCpc || "$3.50"}
+                    </span>
+                    {selectedArticleItem.generatedArticle.images && selectedArticleItem.generatedArticle.images.length > 0 && (
+                      <span className="px-3 py-1 rounded-xl bg-cyan-500/20 border border-cyan-500/40 text-cyan-300 font-bold flex items-center gap-1.5">
+                        <ImageIcon className="w-3.5 h-3.5 text-cyan-400" />
+                        <span>AI 이미지 {selectedArticleItem.generatedArticle.images.length}장 삽입 완료</span>
+                      </span>
+                    )}
                   </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                    {selectedArticleItem.generatedArticle.images.map((img, idx) => (
-                      <div key={img.id || idx} className="flex items-center gap-2.5 p-2 rounded-xl bg-slate-900 border border-slate-800/80 text-[11px]">
-                        <img 
-                          src={img.thumbnailUrl || img.imageUrl} 
-                          alt={img.altText} 
-                          className="w-12 h-12 rounded-lg object-cover border border-slate-700 shrink-0" 
-                        />
-                        <div className="overflow-hidden space-y-0.5">
-                          <p className="font-semibold text-slate-200 truncate">{img.caption || img.altText}</p>
-                          <p className="text-[10px] text-slate-400 truncate">검색어: {img.searchKeyword} | 위치: {img.position}</p>
-                          <p className="text-[10px] text-cyan-400 truncate">출처: {img.sourceName} ({img.license})</p>
-                        </div>
+
+                  {/* Meta description & Tags */}
+                  {selectedArticleItem.generatedArticle.metaDescription && (
+                    <div className="p-3.5 rounded-2xl bg-slate-950 border border-slate-800 space-y-2">
+                      <div className="flex items-center justify-between text-[11px]">
+                        <span className="text-slate-400 font-bold">SEO 메타 디스크립션:</span>
+                        <span className="text-emerald-400 font-mono text-[10px]">구글 스니펫 최적화</span>
                       </div>
-                    ))}
+                      <p className="text-slate-200 text-xs leading-relaxed">
+                        {selectedArticleItem.generatedArticle.metaDescription}
+                      </p>
+                      {selectedArticleItem.generatedArticle.tags && selectedArticleItem.generatedArticle.tags.length > 0 && (
+                        <div className="flex flex-wrap gap-1.5 pt-1">
+                          {selectedArticleItem.generatedArticle.tags.map((tag, idx) => (
+                            <span key={idx} className="px-2 py-0.5 rounded-md bg-slate-800 text-cyan-300 text-[10px] font-mono">
+                              #{tag}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Review AI Evaluation Report (if available) */}
+                  {(selectedArticleItem.generatedArticle.reviewResult || selectedArticleItem.reviewResult) && (() => {
+                    const review = selectedArticleItem.generatedArticle.reviewResult || selectedArticleItem.reviewResult;
+                    if (!review) return null;
+                    return (
+                      <div className="p-3.5 rounded-2xl bg-gradient-to-br from-indigo-950/40 to-slate-950 border border-indigo-500/30 space-y-2.5">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <ShieldCheck className="w-4 h-4 text-indigo-400" />
+                            <span className="text-xs font-bold text-indigo-200">리뷰 & 팩트체킹 AI 품질 진단 리포트</span>
+                          </div>
+                          <span className={`text-[11px] font-bold px-2 py-0.5 rounded-lg border ${
+                            review.passed ? "bg-emerald-950 text-emerald-300 border-emerald-500/40" : "bg-amber-950 text-amber-300 border-amber-500/40"
+                          }`}>
+                            종합 평점: {review.overallScore}점 ({review.passed ? "검수 통과" : "보강 권장"})
+                          </span>
+                        </div>
+                        {review.summaryFeedback && (
+                          <p className="text-xs text-slate-300 bg-slate-900/80 p-2.5 rounded-xl border border-slate-800">
+                            💡 {review.summaryFeedback}
+                          </p>
+                        )}
+                        {review.suggestions && review.suggestions.length > 0 && (
+                          <div className="text-[11px] text-slate-300 space-y-1">
+                            <span className="font-semibold text-indigo-300 block">권장 개선 및 수익화 조언:</span>
+                            {review.suggestions.map((sug, sIdx) => (
+                              <p key={sIdx} className="text-slate-400 pl-2 border-l-2 border-indigo-500/50">
+                                • {sug}
+                              </p>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })()}
+
+                  {/* AI Auto Image Inspection Card */}
+                  {selectedArticleItem.generatedArticle.images && selectedArticleItem.generatedArticle.images.length > 0 && (
+                    <div className="p-3.5 rounded-2xl bg-slate-950 border border-slate-800 space-y-2.5">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <ImageIcon className="w-4 h-4 text-emerald-400" />
+                          <span className="text-xs font-bold text-white">본문 자동 배치 이미지 메타데이터</span>
+                        </div>
+                        <span className="text-[11px] text-emerald-400 font-semibold bg-emerald-950/60 px-2 py-0.5 rounded-lg border border-emerald-800/60">
+                          검수 완료 ({selectedArticleItem.generatedArticle.images.length}장)
+                        </span>
+                      </div>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        {selectedArticleItem.generatedArticle.images.map((img, idx) => (
+                          <div key={img.id || idx} className="flex items-center gap-2.5 p-2 rounded-xl bg-slate-900 border border-slate-800/80 text-[11px]">
+                            <img 
+                              src={img.thumbnailUrl || img.imageUrl} 
+                              alt={img.altText} 
+                              className="w-12 h-12 rounded-lg object-cover border border-slate-700 shrink-0" 
+                            />
+                            <div className="overflow-hidden space-y-0.5">
+                              <p className="font-semibold text-slate-200 truncate">{img.caption || img.altText}</p>
+                              <p className="text-[10px] text-slate-400 truncate">검색어: {img.searchKeyword} | {img.position}</p>
+                              <p className="text-[10px] text-cyan-400 truncate">출처: {img.sourceName} ({img.license})</p>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Rendered HTML Preview */}
+                  <div className="p-5 rounded-2xl bg-white text-slate-900 overflow-x-auto shadow-inner">
+                    <div 
+                      className="prose prose-slate max-w-none text-xs sm:text-sm leading-relaxed"
+                      dangerouslySetInnerHTML={{
+                        __html: selectedArticleItem.generatedArticle.contentHtml || "<p>내용 없음</p>",
+                      }}
+                    />
+                  </div>
+                </>
+              ) : (
+                /* CASE 2: Article is in Topic / Writing Queue (Not written yet) */
+                <div className="space-y-4">
+                  <div className="p-4 rounded-2xl bg-slate-950 border border-cyan-500/30 space-y-3">
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="text-cyan-400 font-bold flex items-center gap-1.5">
+                        <Sparkles className="w-4 h-4" /> 1단 발굴 주제 상세 및 자동 집필 예약
+                      </span>
+                      <span className="px-2.5 py-0.5 rounded-full bg-cyan-950 text-cyan-300 font-mono text-[11px] border border-cyan-800/40">
+                        {selectedArticleItem.urgency === "urgent" ? "🔥 긴급 이슈 (10초)" : "⏰ 정기 스케줄"}
+                      </span>
+                    </div>
+
+                    <div className="p-3.5 rounded-xl bg-slate-900 border border-slate-800 space-y-2">
+                      <span className="text-[11px] text-slate-400 block font-medium">타겟 발굴 주제:</span>
+                      <p className="text-sm font-bold text-white leading-relaxed">
+                        {selectedArticleItem.topic}
+                      </p>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                      <div className="p-3 rounded-xl bg-slate-900 border border-slate-800 space-y-1">
+                        <span className="text-slate-400 text-[11px]">발행 대상 블로그 채널:</span>
+                        <p className="font-semibold text-slate-200">{blog.name}</p>
+                        <p className="text-[10px] text-slate-500 truncate">{blog.blogUrl}</p>
+                      </div>
+
+                      <div className="p-3 rounded-xl bg-slate-900 border border-slate-800 space-y-1">
+                        <span className="text-slate-400 text-[11px]">타겟 틈새 니치 & 독자층:</span>
+                        <p className="font-semibold text-cyan-300">{blog.niche}</p>
+                        <p className="text-[10px] text-slate-400 truncate">{blog.targetAudience}</p>
+                      </div>
+                    </div>
+
+                    <div className="p-3 rounded-xl bg-slate-900/60 border border-slate-800 flex items-center justify-between text-xs">
+                      <span className="text-slate-400 flex items-center gap-1.5">
+                        <Clock className="w-4 h-4 text-cyan-400" />
+                        집필 시작까지 남은 시간:
+                      </span>
+                      <span className="font-mono font-bold text-cyan-300 text-sm">
+                        {selectedArticleItem.remainingDelaySec}초 남음
+                      </span>
+                    </div>
+
+                    <div className="p-3 rounded-xl bg-cyan-950/20 border border-cyan-900/40 text-[11px] text-cyan-200/90 leading-relaxed space-y-1">
+                      <p className="font-bold flex items-center gap-1 text-cyan-300">
+                        <CheckCircle2 className="w-3.5 h-3.5" /> 자동화 파이프라인 안내:
+                      </p>
+                      <p>
+                        타이머가 0초에 도달하면 <strong>2단 글쓰기 AI(Writer)</strong>가 자동으로 영문 SEO 본문을 집필하고, 라이선스 무료 고화질 이미지를 검색하여 본문 요소별로 배치한 뒤 <strong>리뷰·어드바이저 AI</strong> 품질 검수까지 원스톱으로 마칩니다.
+                      </p>
+                    </div>
                   </div>
                 </div>
               )}
-
-              {/* Rendered HTML Preview */}
-              <div className="p-5 rounded-2xl bg-white text-slate-900 overflow-x-auto shadow-inner">
-                <div 
-                  className="prose prose-slate max-w-none text-xs sm:text-sm leading-relaxed"
-                  dangerouslySetInnerHTML={{
-                    __html: selectedArticleItem.generatedArticle?.contentHtml || "<p>내용 없음</p>",
-                  }}
-                />
-              </div>
             </div>
 
-            {/* Modal Footer: 1-Click Copy for Blogger */}
+            {/* Modal Footer */}
             <div className="pt-4 border-t border-slate-800 flex items-center justify-between flex-wrap gap-2">
-              <span className="text-xs text-slate-400">
-                구글 블로그 글쓰기 창에 'HTML 보기' 모드로 전환 후 바로 붙여넣기하세요.
-              </span>
+              {selectedArticleItem.generatedArticle ? (
+                <>
+                  <span className="text-xs text-slate-400">
+                    구글 블로그 글쓰기 창에 'HTML 보기' 모드로 전환 후 바로 붙여넣기(Ctrl+V)하세요.
+                  </span>
 
-              <button
-                onClick={() =>
-                  handleCopyHtml(selectedArticleItem.generatedArticle?.contentHtml || "")
-                }
-                className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-orange-500 to-amber-600 hover:from-orange-600 hover:to-amber-700 text-white font-bold text-xs flex items-center gap-2 shadow-lg shadow-orange-500/20"
-              >
-                {copiedHtml ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
-                <span>{copiedHtml ? "HTML 복사 완료!" : "Google Blogger용 HTML 복사"}</span>
-              </button>
+                  <div className="flex items-center gap-2">
+                    {selectedArticleItem.stage === "waiting_publish" && (
+                      <button
+                        onClick={() => {
+                          onTriggerPublishNow(selectedArticleItem.id);
+                          setSelectedArticleItem(null);
+                        }}
+                        className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs flex items-center gap-1.5 transition-colors"
+                      >
+                        <Send className="w-3.5 h-3.5" />
+                        <span>지금 즉시 블로그 발행</span>
+                      </button>
+                    )}
+
+                    <button
+                      onClick={() =>
+                        handleCopyHtml(selectedArticleItem.generatedArticle?.contentHtml || "")
+                      }
+                      className="px-4 py-2 rounded-xl bg-gradient-to-r from-orange-500 to-amber-600 hover:from-orange-600 hover:to-amber-700 text-white font-bold text-xs flex items-center gap-2 shadow-lg shadow-orange-500/20"
+                    >
+                      {copiedHtml ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+                      <span>{copiedHtml ? "HTML 복사 완료!" : "Google Blogger용 HTML 복사"}</span>
+                    </button>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <button
+                    onClick={() => {
+                      onDeleteItem(selectedArticleItem.id);
+                      setSelectedArticleItem(null);
+                    }}
+                    className="px-3 py-2 rounded-xl bg-slate-800 hover:bg-red-950/40 text-slate-400 hover:text-red-300 text-xs font-semibold flex items-center gap-1.5 transition-colors"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                    <span>대기열에서 삭제</span>
+                  </button>
+
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => {
+                        onTriggerWriteNow(selectedArticleItem.id);
+                        setSelectedArticleItem(null);
+                      }}
+                      className="px-5 py-2.5 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white font-bold text-xs flex items-center gap-2 shadow-lg shadow-cyan-600/20 transition-all"
+                    >
+                      <Zap className="w-4 h-4 text-amber-300" />
+                      <span>⚡ 지금 즉시 글쓰기 AI 가동 (0s)</span>
+                    </button>
+                  </div>
+                </>
+              )}
             </div>
           </div>
         </div>

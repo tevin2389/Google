@@ -22,6 +22,7 @@ interface GoogleBlogsHubProps {
   onOpenAddModal: () => void;
   onEditBlog: (blog: BlogItem) => void;
   onDeleteBlog: (blogId: string) => void;
+  onTriggerAllBlogsTopicAi?: () => void;
 }
 
 export const GoogleBlogsHub: React.FC<GoogleBlogsHubProps> = ({
@@ -30,6 +31,7 @@ export const GoogleBlogsHub: React.FC<GoogleBlogsHubProps> = ({
   onOpenAddModal,
   onEditBlog,
   onDeleteBlog,
+  onTriggerAllBlogsTopicAi,
 }) => {
   const [openMenuBlogId, setOpenMenuBlogId] = useState<string | null>(null);
   const [blogToDelete, setBlogToDelete] = useState<BlogItem | null>(null);
@@ -69,13 +71,26 @@ export const GoogleBlogsHub: React.FC<GoogleBlogsHubProps> = ({
           </p>
         </div>
 
-        <div className="flex items-center gap-3 w-full sm:w-auto justify-between sm:justify-end">
+        <div className="flex items-center gap-3 w-full sm:w-auto justify-between sm:justify-end flex-wrap">
           <div className="text-right hidden sm:block">
             <div className="text-[11px] text-slate-400">오늘 전체 발행</div>
             <div className="text-lg font-black text-amber-400 font-mono">
               총 {totalTodayPosts}개 완료
             </div>
           </div>
+
+          {/* Multi-Agent Swarm Trigger */}
+          {onTriggerAllBlogsTopicAi && (
+            <button
+              id="btn-multi-agent-swarm"
+              onClick={onTriggerAllBlogsTopicAi}
+              className="px-4 py-2.5 rounded-2xl bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 hover:from-indigo-500 hover:to-pink-500 text-white font-bold text-xs sm:text-sm shadow-lg shadow-purple-600/30 flex items-center gap-2 transition-all transform hover:-translate-y-0.5 active:translate-y-0 border border-purple-400/30 ring-1 ring-white/10"
+              title="모든 블로그에 주제 발굴 + 집필 에이전트를 한 번에 동시 가동합니다"
+            >
+              <Sparkles className="w-4 h-4 text-amber-300 animate-pulse" />
+              <span>⚡ 전체 블로그 에이전트 동시 출격</span>
+            </button>
+          )}
 
           {/* Plus Add Blog Button */}
           <button

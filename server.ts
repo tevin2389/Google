@@ -49,9 +49,12 @@ async function generateAIContent({
   if (useOllama && ollamaHost) {
     try {
       const cleanHost = ollamaHost.replace(/\/$/, "");
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 2000);
       const res = await fetch(`${cleanHost}/api/generate`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        signal: controller.signal,
         body: JSON.stringify({
           model: ollamaModel || "qwen2.5:7b",
           prompt: prompt,
@@ -60,6 +63,7 @@ async function generateAIContent({
           format: jsonMode ? "json" : undefined,
         }),
       });
+      clearTimeout(timeoutId);
 
       if (res.ok) {
         const data = await res.json();
@@ -67,8 +71,8 @@ async function generateAIContent({
           return data.response;
         }
       }
-    } catch (err: any) {
-      console.warn("Ollama connection failed, falling back to Gemini:", err.message);
+    } catch {
+      // Ollama not reachable (e.g. running in cloud container); smoothly fall through to Gemini cloud AI
     }
   }
 
