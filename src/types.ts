@@ -1,3 +1,8 @@
+import { ArticleImageRecord, AutoImageConfig, ImageReviewAudit } from "./types/imageTypes";
+import { ArticleReviewResult } from "./types/reviewTypes";
+export * from "./types/imageTypes";
+export * from "./types/reviewTypes";
+
 export type BlogPlatform = "blogger" | "wordpress" | "tistory" | "naver";
 
 export type MonetizationType = "adsense" | "coupang" | "info" | "review";
@@ -14,6 +19,7 @@ export interface StageAiConfig {
   delaySec?: number;
   includeAdSlots?: boolean;
   includeFaq?: boolean;
+  autoImageConfig?: AutoImageConfig;
 }
 
 export interface DirectorAdvice {
@@ -43,6 +49,7 @@ export interface BlogArticleRecord {
   keyStrengths?: string[];
   internalAnchorSuggestions?: string[];
   urgency?: "urgent" | "normal";
+  images?: ArticleImageRecord[];
 }
 
 export interface BlogItem {
@@ -64,6 +71,7 @@ export interface BlogItem {
   topicAiConfig?: StageAiConfig;
   writerAiConfig?: StageAiConfig;
   analyticsAiConfig?: StageAiConfig;
+  autoImageConfig?: AutoImageConfig; // 블로그별 이미지 자동 삽입 설정
   directorAdvice?: DirectorAdvice;
   articleDatabase?: BlogArticleRecord[]; // 블로그별 고유 아티클 DB 및 AI 지식 메모리
   topicAiIntervalMinutes?: number;
@@ -109,8 +117,12 @@ export interface PipelineItem {
     keyTakeaways?: string[];
     monetizationTips?: string[];
     seoScore?: number;
+    images?: ArticleImageRecord[];
+    imageReviewAudit?: ImageReviewAudit;
+    reviewResult?: ArticleReviewResult;
   };
   postData?: GeneratedPost;
+  reviewResult?: ArticleReviewResult;
 
   analyticsReport?: {
     seoScore: number;
@@ -175,6 +187,7 @@ export interface GeneratedPost {
     affiliateTips: string;
     retentionHacks: string;
   };
+  reviewResult?: ArticleReviewResult;
 }
 
 export interface BatchPlanItem {

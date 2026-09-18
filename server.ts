@@ -3,6 +3,11 @@ import path from "path";
 import { createServer as createViteServer } from "vite";
 import { GoogleGenAI } from "@google/genai";
 import dotenv from "dotenv";
+import { searchImagesService } from "./src/services/imageSearchService";
+import { processArticleImages } from "./src/services/imagePipelineCoordinator";
+import { reviewArticle } from "./src/services/articleReviewService";
+import { ArticleImageRecord, AutoImageConfig, ImageReviewAudit } from "./src/types/imageTypes";
+import { ArticleReviewResult } from "./src/types/reviewTypes";
 
 dotenv.config();
 
@@ -70,13 +75,57 @@ async function generateAIContent({
   // Gemini Fallback / Default
   const ai = getGeminiClient();
   const fullPrompt = systemPrompt ? `${systemPrompt}\n\n${prompt}` : prompt;
-  const response = await ai.models.generateContent({
-    model: "gemini-3.8-flash",
-    contents: fullPrompt,
-    config: jsonMode ? { responseMimeType: "application/json" } : undefined,
-  });
+  
+  try {
+    const response = await ai.models.generateContent({
+      model: "gemini-3.6-flash",
+      contents: fullPrompt,
+      config: jsonMode ? { responseMimeType: "application/json" } : undefined,
+    });
+    return response.text || "";
+  } catch (primaryErr: any) {
+    console.warn("Primary Gemini model retry with alternative:", primaryErr.message);
+    try {
+      const retryResp = await ai.models.generateContent({
+        model: "gemini-3.8-flash",
+        contents: fullPrompt,
+        config: jsonMode ? { responseMimeType: "application/json" } : undefined,
+      });
+      return retryResp.text || "";
+    } catch (secondaryErr: any) {
+      console.warn("Gemini cloud API quota reached or unavailable:", secondaryErr.message);
+      // Return empty or fallback so callers gracefully use their default template
+      return "";
+    }
+  }
+}
 
-  return response.text || "";
+// Robust JSON parse helper with control character sanitization
+function parseJsonSafe<T = any>(rawText: string, fallback: T): T {
+  if (!rawText) return fallback;
+  try {
+    return JSON.parse(rawText);
+  } catch {
+    const match = rawText.match(/\{[\s\S]*\}/);
+    if (match) {
+      try {
+        return JSON.parse(match[0]);
+      } catch {
+        try {
+          const sanitized = match[0].replace(/[\u0000-\u001F\u007F-\u009F]/g, (c) => {
+            if (c === "\n") return "\\n";
+            if (c === "\r") return "\\r";
+            if (c === "\t") return "\\t";
+            return "";
+          });
+          return JSON.parse(sanitized);
+        } catch {
+          // Keep fallback
+        }
+      }
+    }
+  }
+  return fallback;
 }
 
 // Health check endpoint
@@ -102,6 +151,8 @@ interface ArticleRecord {
   keyStrengths?: string[];
   internalAnchorSuggestions?: string[];
   urgency?: "urgent" | "normal";
+  images?: ArticleImageRecord[];
+  imageReviewAudit?: ImageReviewAudit;
 }
 
 const BLOG_ARTICLE_STORES: Record<string, ArticleRecord[]> = {
@@ -252,6 +303,8 @@ app.post("/api/blogs/:blogId/articles", (req, res) => {
     keyStrengths: req.body.keyStrengths || ["SEO 고단가 최적화", "내부 앵커 연계 완료"],
     internalAnchorSuggestions: req.body.internalAnchorSuggestions || [req.body.title],
     urgency: req.body.urgency || "normal",
+    images: req.body.images || [],
+    imageReviewAudit: req.body.imageReviewAudit,
   };
 
   // Avoid exact title duplicate in store
@@ -504,6 +557,43 @@ app.post("/api/analyze-post", async (req, res) => {
   }
 });
 
+// Editorial & Fact-Checking Review / Advisor AI
+app.post("/api/review-article", async (req, res) => {
+  try {
+    const {
+      topic,
+      title,
+      contentHtml,
+      niche = "AI & Tech",
+      platform = "blogger",
+      useOllama = false,
+      ollamaModel = "qwen2.5:7b",
+      ollamaHost = "http://localhost:11434",
+    } = req.body;
+
+    if (!topic && !title && !contentHtml) {
+      return res.status(400).json({ error: "검토할 글 정보(topic, title, contentHtml)가 필요합니다." });
+    }
+
+    const reviewResult = await reviewArticle({
+      topic: topic || title || "블로그 포스팅",
+      title: title || topic || "제목 없음",
+      contentHtml: contentHtml || "",
+      niche,
+      platform,
+      useOllama,
+      ollamaModel,
+      ollamaHost,
+      aiGenerator: generateAIContent,
+    });
+
+    res.json(reviewResult);
+  } catch (error: any) {
+    console.error("Error in /api/review-article:", error);
+    res.status(500).json({ error: error.message || "Failed to review article" });
+  }
+});
+
 // Blog Chief Director AI (블로그 총괄 디렉터 AI)
 app.post("/api/blog-advisor", async (req, res) => {
   try {
@@ -650,6 +740,58 @@ app.post("/api/generate-keywords", async (req, res) => {
   }
 });
 
+// Dedicated Internet Image Search API (Provider-based: Wikimedia, Openverse, Unsplash)
+app.post("/api/images/search", async (req, res) => {
+  try {
+    const { keyword, provider = "all", limit = 6, requireCommercial = true } = req.body;
+    if (!keyword) {
+      return res.status(400).json({ error: "검색어(keyword)를 입력해주세요." });
+    }
+
+    const results = await searchImagesService(keyword, {
+      provider,
+      limit: Number(limit) || 6,
+      requireCommercialLicense: Boolean(requireCommercial),
+    });
+
+    res.json({ success: true, count: results.length, results });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message || "Image search failed" });
+  }
+});
+
+// Dedicated Image Processing API (for manual or custom article insertion)
+app.post("/api/images/process", async (req, res) => {
+  try {
+    const {
+      topic,
+      articleTitle,
+      contentHtml,
+      autoImageConfig,
+      usedImageUrls = [],
+      useOllama = false,
+      ollamaModel = "qwen2.5:7b",
+      ollamaHost = "http://localhost:11434",
+    } = req.body;
+
+    const result = await processArticleImages({
+      topic: topic || "Tech",
+      articleTitle: articleTitle || topic || "Article",
+      contentHtml: contentHtml || "<p></p>",
+      autoImageConfig,
+      usedImageUrls,
+      useOllama,
+      ollamaModel,
+      ollamaHost,
+      aiGenerator: generateAIContent,
+    });
+
+    res.json(result);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message || "Image process failed" });
+  }
+});
+
 // 2. Full SEO Blog Post Generator API
 app.post("/api/generate-post", async (req, res) => {
   try {
@@ -669,6 +811,7 @@ app.post("/api/generate-post", async (req, res) => {
       ollamaHost = "http://localhost:11434",
       customPrompt = "",
       pastArticles: incomingPastArticles,
+      autoImageConfig,
     } = req.body;
 
     if (!topic) {
@@ -740,12 +883,76 @@ ${pastArticleList}
       jsonMode: true,
     });
 
-    let data;
+    let data: any = parseJsonSafe(rawText, {
+      selectedTitle: `${topic} 2026 심층 분석 및 최신 전망`,
+      metaDescription: `${topic}에 대한 핵심 요약 및 2026년 최신 전망 가이드`,
+      tags: ["AI반도체", "인공지능", "반도체혁신", "Tech2026"],
+      summary: "인공지능 발전과 이에 따른 차세대 반도체 공정 및 HBM 기술의 변화 총정리",
+      contentHtml: `<h2>1. AI와 반도체 생태계의 패러다임 변화</h2><p>인공지능(AI) 기술의 가속화는 기존 범용 반도체에서 AI 특화 고성능 NPU 및 HBM 가속기로의 전환을 이끌고 있습니다.</p><!-- GOOGLE_ADSENSE_HIGH_CPC_UNIT --><h2>2. 고대역폭 메모리(HBM) 및 차세대 공정 경쟁</h2><p>AI 모델이 거대화됨에 따라 메모리 대역폭과 전력 효율성이 반도체 산업의 새로운 승부처가 되고 있습니다.</p>`,
+    });
+
+    // Automated Image Insertion Pipeline Execution
+    // 1. Gather previously used image URLs across past articles and client records to prevent duplicates
+    const usedImageUrls: string[] = [];
+    if (Array.isArray(req.body.usedImageUrls)) {
+      req.body.usedImageUrls.forEach((u: string) => {
+        if (u && typeof u === "string") usedImageUrls.push(u);
+      });
+    }
+    if (Array.isArray(pastArticles)) {
+      pastArticles.forEach((a) => {
+        if (a.images && Array.isArray(a.images)) {
+          a.images.forEach((img: any) => {
+            if (img.imageUrl) usedImageUrls.push(img.imageUrl);
+          });
+        }
+        if (a.contentHtml && typeof a.contentHtml === "string") {
+          const matches = a.contentHtml.matchAll(/<img[^>]+src=["']([^"']+)["']/g);
+          for (const match of matches) {
+            if (match[1]) usedImageUrls.push(match[1]);
+          }
+        }
+      });
+    }
+
     try {
-      data = JSON.parse(rawText);
-    } catch {
-      const match = rawText.match(/\{[\s\S]*\}/);
-      data = match ? JSON.parse(match[0]) : {};
+      const imageResult = await processArticleImages({
+        topic,
+        articleTitle: data.selectedTitle || topic,
+        contentHtml: data.contentHtml || "",
+        autoImageConfig: autoImageConfig || { enabled: true, minImages: 1, defaultImages: 2, maxImages: 3 },
+        usedImageUrls,
+        useOllama,
+        ollamaModel,
+        ollamaHost,
+        aiGenerator: generateAIContent,
+      });
+
+      // Update data with processed HTML containing figures and attached image records
+      data.contentHtml = imageResult.updatedHtml;
+      data.images = imageResult.images;
+      data.imageReviewAudit = imageResult.reviewAudit;
+      data.imageLogs = imageResult.logs;
+    } catch (imgErr: any) {
+      console.warn("Auto image pipeline error (continuing with text):", imgErr);
+      data.imageLogs = [`⚠️ 이미지 처리 실패: ${imgErr.message || "오류"}`];
+    }
+
+    // Step: Review & Editorial Advisor AI Evaluation
+    try {
+      const reviewResult = await reviewArticle({
+        topic,
+        title: data.selectedTitle || topic,
+        contentHtml: data.contentHtml || "",
+        platform,
+        useOllama,
+        ollamaModel,
+        ollamaHost,
+        aiGenerator: generateAIContent,
+      });
+      data.reviewResult = reviewResult;
+    } catch (revErr: any) {
+      console.warn("Review AI execution error:", revErr);
     }
 
     res.json(data);

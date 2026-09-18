@@ -12,9 +12,12 @@ import {
   DollarSign, 
   Sliders, 
   RotateCcw,
-  CheckCircle2
+  CheckCircle2,
+  Image as ImageIcon,
+  Search,
+  ExternalLink
 } from "lucide-react";
-import { BlogItem, StageAiConfig, WritingTone, PostLength, OllamaSettings } from "../types";
+import { BlogItem, StageAiConfig, WritingTone, PostLength, OllamaSettings, AutoImageConfig } from "../types";
 
 interface AiStageSettingsModalProps {
   isOpen: boolean;
@@ -49,6 +52,14 @@ export const AiStageSettingsModal: React.FC<AiStageSettingsModalProps> = ({
   );
   const [includeAdSlots, setIncludeAdSlots] = useState<boolean>(currentConfig.includeAdSlots ?? true);
   const [includeFaq, setIncludeFaq] = useState<boolean>(currentConfig.includeFaq ?? true);
+  
+  // Automatic Image Insertion Settings for Writer AI
+  const [imageEnabled, setImageEnabled] = useState<boolean>(currentConfig.autoImageConfig?.enabled ?? true);
+  const [imageProvider, setImageProvider] = useState<"all" | "wikimedia" | "openverse" | "unsplash">(currentConfig.autoImageConfig?.provider || "all");
+  const [defaultImages, setDefaultImages] = useState<number>(currentConfig.autoImageConfig?.defaultImages || 2);
+  const [maxImages, setMaxImages] = useState<number>(currentConfig.autoImageConfig?.maxImages || 3);
+  const [requireLicenseCheck, setRequireLicenseCheck] = useState<boolean>(currentConfig.autoImageConfig?.requireLicenseCheck ?? true);
+  
   const [isSaved, setIsSaved] = useState(false);
 
   useEffect(() => {
@@ -67,6 +78,14 @@ export const AiStageSettingsModal: React.FC<AiStageSettingsModalProps> = ({
       setDelaySec(cfg.delaySec ?? (stage === "topic" ? blog.defaultWriteDelaySec : blog.defaultPublishDelaySec));
       setIncludeAdSlots(cfg.includeAdSlots ?? true);
       setIncludeFaq(cfg.includeFaq ?? true);
+      
+      const imgCfg = cfg.autoImageConfig || blog.autoImageConfig;
+      setImageEnabled(imgCfg?.enabled ?? true);
+      setImageProvider(imgCfg?.provider || "all");
+      setDefaultImages(imgCfg?.defaultImages || 2);
+      setMaxImages(imgCfg?.maxImages || 3);
+      setRequireLicenseCheck(imgCfg?.requireLicenseCheck ?? true);
+
       setIsSaved(false);
     }
   }, [isOpen, stage, blog]);
@@ -100,6 +119,16 @@ export const AiStageSettingsModal: React.FC<AiStageSettingsModalProps> = ({
   const info = stageTitles[stage];
 
   const handleSave = () => {
+    const autoImageConfig: AutoImageConfig = {
+      enabled: imageEnabled,
+      provider: imageProvider,
+      defaultImages,
+      maxImages,
+      minImages: 1,
+      requireLicenseCheck,
+      quality: "high",
+    };
+
     onSaveConfig(stage, {
       customPrompt,
       model,
@@ -108,6 +137,7 @@ export const AiStageSettingsModal: React.FC<AiStageSettingsModalProps> = ({
       delaySec,
       includeAdSlots,
       includeFaq,
+      ...(stage === "writer" ? { autoImageConfig } : {}),
     });
     setIsSaved(true);
     setTimeout(() => {
@@ -267,6 +297,74 @@ export const AiStageSettingsModal: React.FC<AiStageSettingsModalProps> = ({
                   />
                   <span>구글 리치 스니펫 대응 FAQ 3선 포함</span>
                 </label>
+              </div>
+
+              {/* Automatic Image Search & Insertion Settings */}
+              <div className="sm:col-span-2 pt-4 border-t border-slate-800/80 space-y-3 bg-slate-900/50 p-4 rounded-xl border">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <div className="w-6 h-6 rounded-lg bg-emerald-500/20 text-emerald-400 flex items-center justify-center">
+                      <ImageIcon className="w-3.5 h-3.5" />
+                    </div>
+                    <div>
+                      <span className="text-xs font-bold text-white">자동 이미지 검색 & 본문 삽입 엔진</span>
+                      <p className="text-[11px] text-slate-400">Ollama 판단 ➔ 인터넷 검색 ➔ 이미지 선별 ➔ figure/출처 자동 삽입</p>
+                    </div>
+                  </div>
+                  <label className="relative inline-flex items-center cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={imageEnabled}
+                      onChange={(e) => setImageEnabled(e.target.checked)}
+                      className="sr-only peer"
+                    />
+                    <div className="w-9 h-5 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-emerald-500"></div>
+                  </label>
+                </div>
+
+                {imageEnabled && (
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2">
+                    <div className="space-y-1">
+                      <label className="text-[11px] font-medium text-slate-300">이미지 검색 제공자</label>
+                      <select
+                        value={imageProvider}
+                        onChange={(e) => setImageProvider(e.target.value as any)}
+                        className="w-full px-2.5 py-1.5 rounded-lg bg-slate-950 border border-slate-700 text-[11px] text-slate-200"
+                      >
+                        <option value="all">전체 통합 (위키미디어+Openverse+Unsplash)</option>
+                        <option value="wikimedia">Wikimedia Commons (풍부한 저작권 메타)</option>
+                        <option value="openverse">Openverse (Creative Commons 공식)</option>
+                        <option value="unsplash">Unsplash Editorial (고화질 상업용 CDN)</option>
+                      </select>
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="text-[11px] font-medium text-slate-300">기본 삽입 장수</label>
+                      <select
+                        value={defaultImages}
+                        onChange={(e) => setDefaultImages(Number(e.target.value))}
+                        className="w-full px-2.5 py-1.5 rounded-lg bg-slate-950 border border-slate-700 text-[11px] text-slate-200"
+                      >
+                        <option value={1}>1장 (도입부 대표 이미지)</option>
+                        <option value={2}>2장 (도입부 + 본문 중간 구조도 - 권장)</option>
+                        <option value={3}>3장 (도입부 + 중간 상세 2장)</option>
+                        <option value={4}>4장 (최대 4장)</option>
+                      </select>
+                    </div>
+
+                    <div className="space-y-1 flex flex-col justify-end">
+                      <label className="flex items-center gap-2 cursor-pointer text-[11px] text-slate-300 py-1.5">
+                        <input
+                          type="checkbox"
+                          checked={requireLicenseCheck}
+                          onChange={(e) => setRequireLicenseCheck(e.target.checked)}
+                          className="w-3.5 h-3.5 rounded text-emerald-600 bg-slate-950 border-slate-700"
+                        />
+                        <span>상업적 CC / 무료 라이선스 검증</span>
+                      </label>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           )}

@@ -323,6 +323,7 @@ export default function App() {
           includeFaq: writerConfig.includeFaq ?? true,
           customPrompt: writerConfig.customPrompt || blog.writerAiPrompt || "",
           pastArticles: blog.articleDatabase || [],
+          autoImageConfig: writerConfig.autoImageConfig || blog.autoImageConfig,
           useOllama: ollamaSettings.useOllama,
           ollamaModel: modelToUse,
           ollamaHost: ollamaSettings.host,
@@ -433,6 +434,7 @@ export default function App() {
         tags: item.generatedArticle?.tags || ["AutoBlog", "HighCPC"],
         keyStrengths: analyticsReport.keyStrengths || ["SEO 고단가 최적화", "중복 방지 통과"],
         contentHtml: item.generatedArticle?.contentHtml || "",
+        images: item.generatedArticle?.images || [],
       };
 
       // Sync with server-side store
