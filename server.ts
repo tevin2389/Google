@@ -1078,13 +1078,20 @@ import os
 import sys
 import threading
 
+# 윈도우 터미널 유니코드 인코딩 설정
+if sys.platform.startswith('win'):
+    try:
+        sys.stdout.reconfigure(encoding='utf-8')
+    except Exception:
+        pass
+
 # ==================== [환경 설정] ====================
 OLLAMA_HOST = "${ollamaHost}".rstrip('/')
 USE_OLLAMA = ${useOllamaDirect ? "True" : "False"}
 WEB_BACKEND = "${currentOrigin}"
 
-# 블로그별 설정
-BLOGS = ${JSON.stringify(blogs, null, 2)}
+# 블로그별 설정 (JSON 안전 로딩)
+BLOGS = json.loads(r'''${JSON.stringify(blogs)}''')
 
 # 워드프레스 설정
 WP_SITE_URL = "${wpSiteUrl}".rstrip('/')
@@ -1105,7 +1112,7 @@ def call_ollama(prompt, model="qwen2.5:7b", json_mode=False):
     try:
         url = f"{OLLAMA_HOST}/api/generate"
         payload = {
-            "model": model,
+            "model": model or "qwen2.5:7b",
             "prompt": prompt,
             "stream": False,
         }
@@ -1275,7 +1282,7 @@ def publisher_ai_worker():
                 except Exception as e:
                     log("발행/분석 AI", f"워드프레스 발행 에러: {e}")
 
-            # 티스토리 / 네이버 / 로컬 보관용 HTML 자동 저장
+            # 티스토리 / 네이버 / 구글 블로거 / 로컬 보관용 HTML 자동 저장
             safe_title = "".join([c for c in title if c.isalnum() or c in (' ', '_', '-')]).strip()[:40]
             filename = f"published_posts/{datetime.date.today()}_{platform}_{safe_title}.html"
             with open(filename, "w", encoding="utf-8") as f:
@@ -1293,7 +1300,7 @@ def main():
     print(f"🤖 AI 엔진: {'Ollama 로컬 무료 무제한 (' + OLLAMA_HOST + ')' if USE_OLLAMA else '클라우드 AI'}")
     print(f"📑 관리 블로그: {len(BLOGS)}개")
     for b in BLOGS:
-        print(f"   • {b.get('name')} ({b.get('platform')}) - {b.get('niche')}")
+        print(f"   • {b.get('name')} ({b.get('platform')}) - {b.get('niche')} [모델: {b.get('ollamaModel', 'qwen2.5:7b')}]")
     print("="*65)
 
     # 3대 AI 백그라운드 스레드 가동
@@ -1317,46 +1324,38 @@ if __name__ == "__main__":
 
   // Windows One-Click Batch Runner (`run_bot.bat`)
   const batchRunner = `@echo off
-chcp 65001 > nul
+setlocal enabledelayedexpansion
 title AutoBlog Pro - Multi-Blog 3-AI Windows Bot
+
 echo ========================================================
-echo   AutoBlog Pro 윈도우 무인 다중 블로그 3단 AI 실행기
-echo   (주제 AI -^> 글쓰기 AI -^> 발행 및 분석 AI)
+echo   AutoBlog Pro 3-AI Windows Bot Launcher
 echo ========================================================
 echo.
 
-:: 1. 파이썬 설치 여부 확인
 python --version >nul 2>&1
 if %errorlevel% neq 0 (
-    echo [경고] 파이썬(Python)이 설치되어 있지 않습니다!
-    echo https://www.python.org/downloads/ 에서 Python을 설치해주세요.
-    echo (설치 시 'Add Python to PATH' 체크박스를 꼭 체크하세요!)
+    echo [ERROR] Python is not installed or not in PATH!
+    echo Please install Python 3.10+ from https://www.python.org/
+    echo Make sure to check Add Python to PATH during installation.
+    echo.
     pause
-    exit /b
+    exit /b 1
 )
 
-:: 2. Ollama 상태 안내
-echo [*] 로컬 무료 무제한 Ollama 연결 확인 중 (http://localhost:11434)...
-curl -s http://localhost:11434/api/tags >nul 2>&1
-if %errorlevel% equ 0 (
-    echo [OK] Ollama 엔진이 정상 작동 중입니다! (100% 무료 무제한 모드)
-) else (
-    echo [안내] Ollama가 켜져 있지 않으면 클라우드 백엔드로 자동 대체됩니다.
-    echo (무제한 무료 이용을 원하시면 Ollama를 실행해주세요: ollama run qwen2.5:7b)
-)
+echo [*] Checking Python dependencies (requests)...
+python -m pip install requests --quiet
 
-:: 3. 필수 패키지 설치
-echo [*] 필수 라이브러리 (requests) 확인 중...
-pip install requests >nul 2>&1
-
-:: 4. 다중 블로그 3단 AI 무인 봇 시작
 echo.
-echo ========================================================
-echo [OK] 윈도우 백그라운드 3단 AI 무인 봇을 시작합니다.
-echo (종료하려면 이 창에서 Ctrl + C를 누르세요)
+echo [*] Starting AutoBlog Pro 3-AI Bot in background...
+echo [*] You can stop the bot anytime with Ctrl+C.
 echo ========================================================
 echo.
 python bot.py
+if %errorlevel% neq 0 (
+    echo.
+    echo [ERROR] Bot stopped unexpectedly.
+    pause
+)
 pause
 `;
 
